@@ -1,0 +1,239 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+// Definição da estrutura de uma Peça
+typedef struct {
+    char nome; // Tipo da peça ('I', 'O', 'T', 'L', etc.)
+    int id;    // Identificador único da peça
+} Peca;
+
+// Tamanho máximo da fila de peças
+#define TAMANHO_MAX_FILA 5
+
+// Definição da estrutura da Fila Circular de Peças
+typedef struct {
+    Peca pecas[TAMANHO_MAX_FILA]; // Array para armazenar as peças
+    int frente;                   // Índice da frente da fila (onde a próxima peça será jogada)
+    int tras;                     // Índice da parte traseira da fila (onde a nova peça será inserida)
+    int contador;                 // Número atual de elementos na fila
+    int proximo_id_global;        // Contador global para gerar IDs únicos para as peças
+} FilaPecas;
+
+// Protótipos das funções
+void inicializarFila(FilaPecas *fila);
+void exibirFila(const FilaPecas *fila);
+Peca gerarPeca(int *id_global);
+int enfileirar(FilaPecas *fila, Peca nova_peca);
+int desenfileirar(FilaPecas *fila, Peca *peca_removida);
+void menuAcoes(FilaPecas *fila);
+
+/**
+ * @brief Inicializa a fila de peças, preenchendo-a inicialmente
+ * e definindo os índices e contadores iniciais.
+ * * @param fila Ponteiro para a estrutura FilaPecas a ser inicializada.
+ */
+void inicializarFila(FilaPecas *fila) {
+    fila->frente = 0;
+    fila->tras = -1; // Usamos -1 para indicar que o primeiro enqueue colocará na posição 0
+    fila->contador = 0;
+    fila->proximo_id_global = 0;
+
+    // Inicializa a fila com o número fixo de elementos (TAMANHO_MAX_FILA)
+    printf("Inicializando a fila de pecas...\n");
+    for (int i = 0; i < TAMANHO_MAX_FILA; i++) {
+        Peca nova = gerarPeca(&(fila->proximo_id_global));
+        // A função enfileirar é usada aqui para preencher de forma correta
+        enfileirar(fila, nova);
+    }
+    printf("Fila inicializada com %d pecas.\n", fila->contador);
+}
+
+/**
+ * @brief Gera uma nova peça com um tipo aleatório ('I', 'O', 'T', 'L')
+ * e um ID único.
+ * * @param id_global Ponteiro para o contador de ID global para garantir unicidade.
+ * @return Peca A nova peça gerada.
+ */
+Peca gerarPeca(int *id_global) {
+    Peca nova_peca;
+    char tipos[] = {'I', 'O', 'T', 'L', 'J', 'S', 'Z'}; // Tipos possíveis de peças
+    int num_tipos = sizeof(tipos) / sizeof(tipos[0]);
+
+    // Seleciona um tipo de peça aleatoriamente
+    nova_peca.nome = tipos[rand() % num_tipos];
+
+    // Atribui o ID único e incrementa o contador global
+    nova_peca.id = *id_global;
+    (*id_global)++;
+
+    return nova_peca;
+}
+
+/**
+ * @brief Insere uma nova peça no final da fila (enqueue).
+ * Implementa a lógica da fila circular para reaproveitamento de espaço.
+ * * @param fila Ponteiro para a estrutura FilaPecas.
+ * @param nova_peca A peça a ser inserida.
+ * @return int Retorna 1 em caso de sucesso, 0 se a fila estiver cheia.
+ */
+int enfileirar(FilaPecas *fila, Peca nova_peca) {
+    if (fila->contador == TAMANHO_MAX_FILA) {
+        printf("ERRO: Fila cheia! Nao e possivel inserir mais pecas.\n");
+        return 0; // Fila cheia
+    }
+
+    // Calcula a nova posição da cauda (circular)
+    // Se for a primeira inserção (tras == -1), o novo tras será 0
+    if (fila->tras == -1) {
+        fila->tras = 0;
+    } else {
+        fila->tras = (fila->tras + 1) % TAMANHO_MAX_FILA;
+    }
+
+    // Insere a peça
+    fila->pecas[fila->tras] = nova_peca;
+    fila->contador++;
+
+    printf("Peca [%c %d] inserida ao final da fila.\n", nova_peca.nome, nova_peca.id);
+    return 1; // Sucesso
+}
+
+/**
+ * @brief Remove a peça da frente da fila (dequeue), simulando o ato de "jogar"
+ * a próxima peça. Implementa a lógica da fila circular.
+ * * @param fila Ponteiro para a estrutura FilaPecas.
+ * @param peca_removida Ponteiro para onde a peça removida será copiada.
+ * @return int Retorna 1 em caso de sucesso, 0 se a fila estiver vazia.
+ */
+int desenfileirar(FilaPecas *fila, Peca *peca_removida) {
+    if (fila->contador == 0) {
+        printf("ERRO: Fila vazia! Nao ha pecas para jogar.\n");
+        return 0; // Fila vazia
+    }
+
+    // Copia a peça da frente para o ponteiro de retorno
+    *peca_removida = fila->pecas[fila->frente];
+
+    // Atualiza a frente (circular)
+    fila->frente = (fila->frente + 1) % TAMANHO_MAX_FILA;
+    fila->contador--;
+
+    // Se a fila ficar vazia, redefinimos a 'tras' para -1 para o próximo enfileiramento
+    if (fila->contador == 0) {
+        fila->frente = 0;
+        fila->tras = -1;
+    }
+    
+    printf("Peca jogada: [%c %d]. Removida da frente da fila.\n", peca_removida->nome, peca_removida->id);
+    return 1; // Sucesso
+}
+
+/**
+ * @brief Exibe o estado atual da fila, mostrando o tipo e ID de cada peça.
+ * Percorre a fila de forma circular, começando pela 'frente'.
+ * * @param fila Ponteiro constante para a estrutura FilaPecas.
+ */
+void exibirFila(const FilaPecas *fila) {
+    printf("\n--- Visualizacao da Fila de Pecas (TAMANHO: %d/%d) ---\n", fila->contador, TAMANHO_MAX_FILA);
+
+    if (fila->contador == 0) {
+        printf("Fila de pecas vazia.\n");
+        printf("------------------------------------------------------\n");
+        return;
+    }
+
+    printf("Fila de pecas: ");
+    int i = fila->frente; // Começa na frente
+    int pecas_exibidas = 0;
+
+    // Loop para exibir todas as peças na ordem correta (da frente para a tras)
+    while (pecas_exibidas < fila->contador) {
+        printf("[%c %d]", fila->pecas[i].nome, fila->pecas[i].id);
+
+        // Avança para o próximo índice de forma circular
+        i = (i + 1) % TAMANHO_MAX_FILA;
+        pecas_exibidas++;
+        
+        // Adiciona um espaço, exceto após a última peça
+        if (pecas_exibidas < fila->contador) {
+            printf(" ");
+        }
+    }
+    printf("\n");
+    // Informações de controle para debug/entendimento
+    // printf("Indices de controle: Frente = %d, Tras = %d\n", fila->frente, fila->tras);
+    printf("------------------------------------------------------\n");
+}
+
+/**
+ * @brief Apresenta o menu de ações ao jogador e processa a escolha.
+ * * @param fila Ponteiro para a estrutura FilaPecas a ser manipulada.
+ */
+void menuAcoes(FilaPecas *fila) {
+    int opcao = -1;
+    
+    // Loop principal do jogo
+    while (opcao != 0) {
+        exibirFila(fila); // Exibe o estado atual da fila antes das ações
+        
+        printf("\nOpcoes de acao:\n");
+        printf("-----------------------\n");
+        printf("Codigo | Acao\n");
+        printf("1      | Jogar peca (dequeue)\n");
+        printf("2      | Inserir nova peca (enqueue)\n");
+        printf("0      | Sair\n");
+        printf("-----------------------\n");
+        printf("Escolha uma opcao: ");
+        
+        // Validação básica da entrada
+        if (scanf("%d", &opcao) != 1) {
+            printf("Entrada invalida. Por favor, digite um numero.\n");
+            // Limpa o buffer de entrada para evitar loop infinito
+            while (getchar() != '\n');
+            continue;
+        }
+
+        switch (opcao) {
+            case 1: { // Jogar peça (dequeue)
+                Peca jogada;
+                desenfileirar(fila, &jogada);
+                break;
+            }
+            case 2: { // Inserir nova peça (enqueue)
+                // Gera a nova peça automaticamente
+                Peca nova = gerarPeca(&(fila->proximo_id_global));
+                enfileirar(fila, nova);
+                break;
+            }
+            case 0: { // Sair
+                printf("Encerrando o Tetris Stack - Controle de Pecas. Ate logo!\n");
+                break;
+            }
+            default: {
+                printf("Opcao invalida. Tente novamente.\n");
+                break;
+            }
+        }
+        printf("\n"); // Espaço para melhor usabilidade
+    }
+}
+
+/**
+ * @brief Função principal do programa.
+ * * @return int Código de saída do programa.
+ */
+int main() {
+    // Inicializa o gerador de números aleatórios para a geração de peças
+    srand(time(NULL));
+
+    FilaPecas fila_pecas;
+
+    // 1. Inicializa a fila de peças com 5 elementos
+    inicializarFila(&fila_pecas);
+
+    // 2. Inicia o menu de ações para manipulação da fila
+    menuAcoes(&fila_pecas);
+
+    return 0;
+}
